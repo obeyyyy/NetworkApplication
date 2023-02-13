@@ -209,7 +209,7 @@ class Traceroute(NetworkApplication):
         icmpS = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) 
         
         while True:
-         
+         ovr_time = [] # making a list to store the times 
          recv_time = 0
          time_sent = 0
          icmpS.setsockopt(socket.SOL_IP,socket.IP_TTL,ttl)
@@ -219,19 +219,19 @@ class Traceroute(NetworkApplication):
           icmpS.sendto(send_data ,(hostName,1))
           time_sent = time.time() ## record time
           recv_data, address = icmpS.recvfrom(1024)
-          recv_time = time.time() # stop the time
-          ovr_time = round((recv_time - time_sent) * 1000,3) 
+          recv_time = time.time() # stop the tim
+          ovr_time.append((recv_time - time_sent)*1000) #appends the time value to the list
          
          try:  
            addrName = address[0] 
            icmp_type, code, checksum, id, seq = struct.unpack("BBHHH",recv_data[20:28])
-          
            host = socket.gethostbyaddr(addrName)[0] 
-           print(f"{ttl}: {host} ({addrName})   {ovr_time}ms   {ovr_time} ms  {ovr_time} ms")
-         
+           #print(f"{ttl}: {host} ({addrName})   {ovr_time} ms")
+           self.printMultipleResults(ttl,addrName,ovr_time,host)
          except socket.herror:
             hosterr = address[0]
-            print(f"{ttl}: {hosterr}, {addrName}")
+            #print(f"{ttl}: {hosterr}, {addrName}")
+            self.printMultipleResults(ttl,addrName,ovr_time,host)
  
          if icmp_type == 0:
             break
