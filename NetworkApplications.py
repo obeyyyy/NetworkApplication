@@ -114,7 +114,7 @@ class NetworkApplication:
                 latencies += '* ' 
 
         if noResponse is False:
-            print("%d %s (%s) %s" % (ttl, destinationHostname, destinationAddress, latencies))
+            print("%d %s (%s) %s" % (ttl, destinationHostname, destinationAddress, latencies ))
         else:
             print("%d %s" % (ttl, latencies))
 
@@ -212,8 +212,11 @@ class Traceroute(NetworkApplication):
          ovr_time = [] # making a list to store the times 
          recv_time = 0
          time_sent = 0
+         checksum = 0
          icmpS.setsockopt(socket.SOL_IP,socket.IP_TTL,ttl)
-         send_data = struct.pack("BBHHH", 8, 0,0,ttl, 1)
+         send_data = struct.pack("BBHHH", 8, checksum,0,ttl, 1)
+         checksum = NetworkApplication.checksum(self,send_data)
+         send_data = struct.pack("BBHHH", 8, 0,checksum,ttl, 1)
 
          for i in range(3):
           icmpS.sendto(send_data ,(hostName,1))
@@ -221,18 +224,20 @@ class Traceroute(NetworkApplication):
           recv_data, address = icmpS.recvfrom(1024)
           recv_time = time.time() # stop the tim
           ovr_time.append((recv_time - time_sent)*1000) #appends the time value to the list
-         
+          
          try:  
+           
            addrName = address[0] 
-           icmp_type, code, checksum, id, seq = struct.unpack("BBHHH",recv_data[20:28])
+           icmp_type, code, checksume, id, seq = struct.unpack("BBHHH",recv_data[20:28])
            host = socket.gethostbyaddr(addrName)[0] 
            #print(f"{ttl}: {host} ({addrName})   {ovr_time} ms")
-           self.printMultipleResults(ttl,addrName,ovr_time,host)
+           self.printMultipleResults(ttl,addrName, ovr_time ,host)
+           icmpS.settimeout(5)
          except socket.herror:
             hosterr = address[0]
             #print(f"{ttl}: {hosterr}, {addrName}")
-            self.printMultipleResults(ttl,addrName,ovr_time,host)
- 
+            self.printMultipleResults(ttl,addrName, ovr_time ,hosterr)
+            icmpS.settimeout(5)
          if icmp_type == 0:
             break
         
@@ -249,7 +254,75 @@ class ParisTraceroute(NetworkApplication):
 
     def __init__(self, args):
         # Please ensure you print each result using the printOneResult method!
-        print('Paris-Traceroute to: %s...' % (args.hostname))
+        hostName = socket.gethostbyname(args.hostname)
+        print('Traceroute to: %s...' % (args.hostname),hostName,"30 max hops") 
+      
+        ttl = 1
+        icmpS = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) 
+        packet_loss = 0
+        
+        while True:
+            
+         checksum = 0
+         ovr_time = [] # making a list to store the times 
+         recv_time = 0
+         time_sent = 0
+         packetSent = 0
+         packetRecvd = 0
+         rtt = [] # round trip time
+         icmpS.setsockopt(socket.SOL_IP,socket.IP_TTL,ttl)
+         send_data = struct.pack("BBHHH", 8, 0,checksum,ttl, 1)
+         checksum = NetworkApplication.checksum(self,send_data)
+         send_data = struct.pack("BBHHH", 8, 0,checksum,ttl, 1)
+
+         for i in range(3):
+          icmpS.settimeout(5)
+         
+          icmpS.sendto(send_data ,(hostName,1))
+          packetSent += 1
+          time_sent = time.time() ## record time
+          recv_data, address = icmpS.recvfrom(1024)
+          packetRecvd += 1
+          recv_time = time.time() # stop the time
+          
+          ovr_time.append((recv_time - time_sent)*1000) #appends the time value to the list
+          rtt.append((sorted(ovr_time)[len(ovr_time)//2]))
+          packet_loss  = (packetSent - packetRecvd ) / packetSent * 100 
+         
+         if ovr_time:
+            
+          try:  
+           #rtt = ovr_time[1]
+           icmpS.settimeout(5)
+           addrName = address[0] 
+           icmp_type, code, checksume, id, seq = struct.unpack("BBHHH",recv_data[20:28])
+           host = socket.gethostbyaddr(addrName)[0] 
+           #print(f"{ttl}: {host} ({addrName})   {ovr_time} ms")
+           self.printMultipleResults(ttl,addrName, rtt ,host)
+           pass
+           
+          except socket.herror:
+            icmpS.settimeout(5)
+            hosterr = address[0]
+            #print(f"{ttl}: {hosterr}, {addrName}")
+            self.printMultipleResults(ttl,addrName, rtt ,hosterr)
+            pass
+ 
+ 
+         
+         if icmp_type == 0:
+            break
+        
+         ttl += 1
+        if __name__ == "__main__":
+         #self.printOneResult(address,len(recv_data),20,ttl,hostName)
+         self.printAdditionalDetails(packet_loss)
+        else:
+         self.printMultipleResults(ttl,addrName,rtt,host)
+
+
+
+
 
 class WebServer(NetworkApplication):
 
