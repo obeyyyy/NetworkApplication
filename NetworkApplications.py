@@ -226,10 +226,9 @@ class Traceroute(NetworkApplication):
           ovr_time.append((recv_time - time_sent)*1000) #appends the time value to the list
           
          try:  
-           
            addrName = address[0] 
            icmp_type, code, checksume, id, seq = struct.unpack("BBHHH",recv_data[20:28])
-           host = socket.gethostbyaddr(addrName)[0] 
+           host = socket.gethostbyaddr(addrName)[0]
            #print(f"{ttl}: {host} ({addrName})   {ovr_time} ms")
            self.printMultipleResults(ttl,addrName, ovr_time ,host)
            icmpS.settimeout(5)
@@ -256,7 +255,6 @@ class ParisTraceroute(NetworkApplication):
         # Please ensure you print each result using the printOneResult method!
         hostName = socket.gethostbyname(args.hostname)
         print('Traceroute to: %s...' % (args.hostname),hostName,"30 max hops") 
-      
         ttl = 1
         icmpS = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP) 
         packet_loss = 0
@@ -277,14 +275,13 @@ class ParisTraceroute(NetworkApplication):
 
          for i in range(3):
           icmpS.settimeout(5)
-         
           icmpS.sendto(send_data ,(hostName,1))
           packetSent += 1
           time_sent = time.time() ## record time
           recv_data, address = icmpS.recvfrom(1024)
+         
           packetRecvd += 1
-          recv_time = time.time() # stop the time
-          
+          recv_time = time.time() # stop the time  
           ovr_time.append((recv_time - time_sent)*1000) #appends the time value to the list
           rtt.append((sorted(ovr_time)[len(ovr_time)//2]))
           packet_loss  = (packetSent - packetRecvd ) / packetSent * 100 
@@ -309,7 +306,6 @@ class ParisTraceroute(NetworkApplication):
             pass
  
  
-         
          if icmp_type == 0:
             break
         
@@ -326,22 +322,55 @@ class ParisTraceroute(NetworkApplication):
 
 class WebServer(NetworkApplication):
 
-    def handleRequest(tcpSocket):
+    def handleRequest(self,tcpSocket,connection):
         # 1. Receive request message from the client on connection socket
+        data = connection.recv(1024)
+        #print(data)
         # 2. Extract the path of the requested object from the message (second part of the HTTP header)
+        path = data.split()
+        
+        print(path[1].decode('utf-8'))
         # 3. Read the corresponding file from disk
-        # 4. Store in temporary buffer
-        # 5. Send the correct HTTP response error
+        try:
+              fullPath = '/home/elghamma/h-drive/Term2/203scc' +  path[1].decode('utf-8')
+              print(fullPath)
+              f = open(fullPath,'rb') 
+              content = f.read()  # 4. Store in temporary buffer
+              response = ("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}".format(len(content), content.decode('utf-8')))   # 5. Send the correct HTTP response error
+              response = response.encode() 
+        except FileNotFoundError:
+              print("file not found")
+
+         
+        
+      
         # 6. Send the content of the file to the socket
+        #tcpSocket.sendall(response.encode())
+        print(response)
+        connection.sendall(response)
+        connection.close()
         # 7. Close the connection socket
+        
         pass
+    
 
     def __init__(self, args):
         print('Web Server starting on port: %i...' % (args.port))
         # 1. Create server socket
+        hostName = '127.0.0.1'
+        Port = 8080
+        Server_socket = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        Server_socket.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
         # 2. Bind the server socket to server address and server port
+        Server_socket.bind((hostName,Port))
         # 3. Continuously listen for connections to server socket
-        # 4. When a connection is accepted, call handleRequest function, passing new connection socket (see https://docs.python.org/3/library/socket.html#socket.socket.accept)
+        Server_socket.listen()
+        # 4. When a connection is accepted , call handleRequest function, passing new connection socket (see https://docs.python.org/3/library/socket.html#socket.socket.accept)
+        connected, address = Server_socket.accept() 
+        if connected:
+         self.handleRequest(Server_socket,connected)
+         print(f"Connected from {address}")
+         Server_socket.close()
         # 5. Close server socket
 
 
